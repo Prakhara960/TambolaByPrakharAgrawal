@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Tambola Ultra | By Prakhar Agrawal</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #00f2ff; --accent: #bc13fe; --panel: #121212; --error: #ff4757; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; outline: none; }
+        body { height: 100dvh; overflow: hidden; background: #000; color: #fff; display: flex; flex-direction: column; }
+        
+        /* Event Feed */
+        #event-feed { position: fixed; top: 10px; right: 10px; z-index: 5000; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+        .feed-item { background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); padding: 5px 12px; border-radius: 20px; font-size: 9px; font-weight: 900; color: #fff; border: 1px solid var(--primary); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* Full Board Sidebar */
+        #board-sidebar { position: fixed; left: -100%; top: 0; width: 100%; height: 100%; background: #000; z-index: 4000; transition: 0.3s; padding: 15px; display: flex; flex-direction: column; }
+        #board-sidebar.open { left: 0; }
+        .board-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 15px; }
+        .b-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; background: #111; color: #333; border-radius: 4px; border: 1px solid #222; }
+        .b-cell.called { background: var(--primary); color: #000; border: none; box-shadow: 0 0 8px var(--primary); }
+
+        .app-shell { height: 100%; width: 100%; max-width: 420px; margin: auto; display: flex; flex-direction: column; padding: 6px; gap: 5px; }
+        .header-box { background: var(--panel); border-radius: 10px; padding: 6px 10px; border: 1px solid #222; }
+        .p-tag { font-size: 8px; background: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: 900; margin-right: 4px; }
+
+        .game-status { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 70px; }
+        .current-box { background: var(--panel); border-radius: 12px; border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; position: relative; }
+        .num-now { font-size: 40px; font-weight: 900; color: var(--primary); }
+
+        /* Dividends 3-Column Grid */
+        .div-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+        .div-card { background: var(--panel); border-radius: 8px; padding: 4px; text-align: center; border: 1px solid #222; height: 60px; display: flex; flex-direction: column; justify-content: space-between; }
+        .div-card b { font-size: 8px; color: #777; }
+        .div-card span { font-size: 10px; color: var(--primary); font-weight: 900; }
+        .claim-btn { background: #fff; color: #000; border: none; border-radius: 4px; font-size: 8px; padding: 2px 0; font-weight: 900; }
+
+        .ticket-area { flex-grow: 1; display: flex; align-items: center; background: #080808; border-radius: 12px; padding: 5px; border: 1px solid #111; }
+        .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; width: 100%; height: 95%; }
+        .cell { background: #151515; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; border: 1px solid #222; color: #333; }
+        .cell.active { color: #fff; border-color: #333; }
+        .cell.marked { background: var(--primary) !important; color: #000; box-shadow: 0 0 10px var(--primary); border: none; }
+
+        .footer { display: flex; flex-direction: column; gap: 4px; }
+        .controls { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 4px; height: 45px; }
+        .btn-f { border: none; border-radius: 10px; font-weight: 900; font-size: 10px; cursor: pointer; color: #fff; }
+        
+        #setup-view { position: fixed; inset: 0; background: #000; z-index: 6000; display: flex; flex-direction: column; justify-content: center; padding: 30px; gap: 15px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="event-feed"></div>
+
+<div id="board-sidebar">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="color:var(--primary); font-size:18px;">LIVE BOARD</h2>
+        <button onclick="toggleBoard()" style="background:var(--error); color:#fff; border:none; padding:5px 15px; border-radius:10px; font-weight:900;">CLOSE</button>
+    </div>
+    <div class="board-grid" id="full-board-grid"></div>
+</div>
+
+<div id="setup-view">
+    <h1 style="text-align:center; color:var(--primary); font-size:35px; font-weight:900;">TAMBOLA<br><span style="color:var(--accent); font-size:25px;">ULTRA PRO</span></h1>
+    <input type="text" id="p-name" style="background:#111; border:1px solid #333; color:#fff; padding:18px; border-radius:15px; text-align:center; font-size:18px;" placeholder="YOUR NAME">
+    <button onclick="initPeer(true)" style="height:60px; border:none; border-radius:15px; font-weight:900; background:var(--primary); font-size:18px;">HOST GAME</button>
+    <input type="text" id="r-id" style="background:#111; border:1px solid #333; color:#fff; padding:18px; border-radius:15px; text-align:center; font-size:18px;" placeholder="ROOM CODE">
+    <button onclick="initPeer(false)" style="height:60px; border:none; border-radius:15px; font-weight:900; background:var(--accent); color:#fff; font-size:18px;">JOIN GAME</button>
+</div>
+
+<div class="app-shell hidden" id="main-ui">
+    <div class="header-box">
+        <div style="font-size:8px; color:#555; font-weight:900; display:flex; justify-content:space-between;">
+            <span>ACTIVE PLAYERS</span>
+            <span id="p-count" style="color:var(--primary)">1</span>
+        </div>
+        <div id="p-list" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;"></div>
+    </div>
+
+    <div class="game-status">
+        <div class="current-box"><div id="cur-num" class="num-now">--</div></div>
+        <div style="background:var(--panel); border:1px solid #222; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div id="hist-list" style="display:flex; gap:3px; margin-bottom:5px;"></div>
+            <div id="num-count" style="font-size:10px; color:#444; font-weight:900;">0/90</div>
+        </div>
+    </div>
+
+    <div class="div-grid" id="prizes"></div>
+    <div class="ticket-area"><div class="t-grid" id="ticket"></div></div>
+
+    <div class="footer">
+        <div id="host-ctrl" class="controls hidden">
+            <button class="btn-f" style="background:var(--primary); color:#000;" onclick="draw()">DRAW</button>
+            <button class="btn-f" style="background:#222;" onclick="toggleBoard()">BOARD</button>
+            <button class="btn-f" style="background:#333;" onclick="copyCode()">CODE</button>
+            <button class="btn-f" style="background:#25D366;" onclick="shareWhatsApp()">WA</button>
+        </div>
+        <div id="player-ctrl" class="controls hidden">
+            <button class="btn-f" style="background:#222; grid-column: span 2;" onclick="toggleBoard()">VIEW FULL BOARD</button>
+            <button class="btn-f" style="background:#333;" disabled>LIVE</button>
+            <button class="btn-f" style="background:var(--error);" onclick="exitGame()">EXIT</button>
+        </div>
+        <div style="text-align:center; font-size:9px; color:#222; font-weight:900;">DEVELOPED BY PRAKHAR AGRAWAL</div>
+    </div>
+</div>
+
+<script>
+    let peer, conn, isHost, myTicket=[], called=[], players={}, myName="", lastV=null;
+    const dividends = [
+        {id:"e5", name:"Early 5", amt:20}, {id:"tl", name:"Top Line", amt:15, row:0},
+        {id:"ml", name:"Mid Line", amt:15, row:1}, {id:"bl", name:"Bot Line", amt:15, row:2},
+        {id:"cn", name:"Corners", amt:15}, {id:"mn", name:"Mid Num", amt:10},
+        {id:"bf", name:"Breakfast", amt:20, cols:[0,1,2]}, {id:"lc", name:"Lunch", amt:20, cols:[3,4,5]},
+        {id:"dn", name:"Dinner", amt:20, cols:[6,7,8]}, {id:"h1", name:"House 1", amt:70, isFH:true},
+        {id:"h2", name:"House 2", amt:50, isFH:true}, {id:"h3", name:"House 3", amt:30, isFH:true}
+    ];
+
+    function toggleBoard() { document.getElementById('board-sidebar').classList.toggle('open'); }
+    function addFeed(msg) {
+        const feed = document.getElementById('event-feed');
+        const div = document.createElement('div');
+        div.className = 'feed-item'; div.innerText = msg;
+        feed.prepend(div); setTimeout(() => div.remove(), 4000);
+    }
+
+    function initPeer(h) {
+        myName = document.getElementById('p-name').value.trim();
+        if(!myName) return alert("Name required!");
+        buildTicket();
+        initBoardGrid();
+        isHost = h;
+        peer = new Peer();
+        peer.on('open', id => {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('main-ui').classList.remove('hidden');
+            if(isHost) {
+                players[id] = myName;
+                document.getElementById('host-ctrl').classList.remove('hidden');
+                updateUI();
+                peer.on('connection', c => {
+                    c.on('open', () => {
+                        c.on('data', d => {
+                            if(d.type==='JOIN') { players[c.peer]=d.name; addFeed(`${d.name} JOINED`); sync(); }
+                            if(d.type==='MARK') addFeed(`${d.name} MARKED ${d.num}`);
+                            if(d.type==='CLAIM') validateClaim(d);
+                            if(d.type==='EXIT') { addFeed(`${players[c.peer]} LEFT`); delete players[c.peer]; sync(); }
+                        });
+                    });
+                });
+            } else { 
+                document.getElementById('player-ctrl').classList.remove('hidden');
+                connectToHost(); 
+            }
+        });
+    }
+
+    function connectToHost() {
+        const rid = document.getElementById('r-id').value.trim();
+        conn = peer.connect(rid);
+        conn.on('open', () => {
+            conn.send({type:'JOIN', name: myName});
+            conn.on('data', d => {
+                if(d.type==='SYNC') { 
+                    called = d.called; players = d.players; 
+                    d.divs.forEach((v,i) => dividends[i].win=v.win);
+                    updateUI(); 
+                }
+                if(d.type==='FEED') addFeed(d.msg);
+            });
+        });
+    }
+
+    function sync() {
+        if(!isHost) return;
+        const data = { type:'SYNC', called, divs:dividends, players };
+        Object.keys(peer.connections).forEach(pid => {
+            peer.connections[pid].forEach(c => { if(c.open) c.send(data); });
+        });
+        updateUI();
+    }
+
+    function updateUI() {
+        const last = called[called.length-1];
+        document.getElementById('cur-num').innerText = last || '--';
+        document.getElementById('num-count').innerText = called.length + "/90";
+        document.getElementById('p-count').innerText = Object.keys(players).length;
+        document.getElementById('p-list').innerHTML = Object.values(players).map(p => `<span class="p-tag">${p.toUpperCase()}</span>`).join('');
+        
+        let hist = [...called].reverse().slice(1, 5);
+        document.getElementById('hist-list').innerHTML = hist.map(n => `<div style="width:20px;height:20px;background:#1a1a1a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#555;border:1px solid #333;font-weight:900;">${n}</div>`).join('');
+
+        document.getElementById('prizes').innerHTML = dividends.map((d, i) => {
+            let s = `<button class="claim-btn" ${d.win ? 'disabled' : ''} onclick="claim(${i})">CLAIM</button>`;
+            if(d.win) s = `<div style="font-size:7px; color:#00ff88; font-weight:900; overflow:hidden;">🏆 ${d.win.toUpperCase()}</div>`;
+            return `<div class="div-card"><b>${d.name}</b><span>₹${d.amt}</span>${s}</div>`;
+        }).join('');
+
+        // Update Full Board
+        for(let i=1; i<=90; i++){
+            const cell = document.getElementById(`bc-${i}`);
+            if(called.includes(i)) cell.classList.add('called');
+        }
+
+        if(last && last !== lastV) {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(last));
+            lastV = last;
+        }
+    }
+
+    function initBoardGrid() {
+        let h = ""; for(let i=1; i<=90; i++) h += `<div class="b-cell" id="bc-${i}">${i}</div>`;
+        document.getElementById('full-board-grid').innerHTML = h;
+    }
+
+    function buildTicket() {
+        const t = Array.from({length:3},()=>Array(9).fill(0));
+        let count = 0; const colRanges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+        while(count < 15) {
+            let r = Math.floor(Math.random()*3), c = Math.floor(Math.random()*9);
+            if(t[r][c] === 0 && t[r].filter(x=>x!==0).length < 5) {
+                let n = Math.floor(Math.random()*(colRanges[c][1]-colRanges[c][0]+1))+colRanges[c][0];
+                if(!t.flat().includes(n)) { t[r][c] = n; count++; }
+            }
+        }
+        myTicket = t;
+        document.getElementById('ticket').innerHTML = t.flat().map(n => n?`<div class="cell active" id="c-${n}" onclick="mark(${n})">${n}</div>`:`<div class="cell empty"></div>`).join('');
+    }
+
+    function mark(n) {
+        if(called.includes(n)) {
+            const el = document.getElementById(`c-${n}`);
+            if(!el.classList.contains('marked')) {
+                el.classList.add('marked');
+                if(!isHost && conn) conn.send({type:'MARK', name: myName, num: n});
+                else if(isHost) addFeed(`MARKED ${n}`);
+            }
+        }
+    }
+
+    function draw() { if(isHost && called.length<90) { let n; do{n=Math.floor(Math.random()*90)+1}while(called.includes(n)); called.push(n); sync(); } }
+    function claim(idx) {
+        const d = { type:'CLAIM', idx, name: myName, ticket: myTicket, lastAtClaim: called[called.length-1] };
+        if(isHost) validateClaim(d); else if(conn) conn.send(d);
+    }
+
+    function validateClaim(d) {
+        const p = dividends[d.idx];
+        if(p.win) return;
+        const currentNum = called[called.length-1];
+        if(d.lastAtClaim !== currentNum) { broadcastFeed(`${d.name}: BOGIE (Late)`); return; }
+        let target = [];
+        if(p.id==="e5" || p.isFH) target = d.ticket.flat().filter(n=>n>0);
+        else if(p.row!==undefined) target = d.ticket[p.row].filter(n=>n>0);
+        else if(p.id==="cn") target = [d.ticket[0].find(n=>n>0), [...d.ticket[0]].reverse().find(n=>n>0), d.ticket[2].find(n=>n>0), [...d.ticket[2]].reverse().find(n=>n>0)].filter(n=>n>0);
+        else if(p.id==="mn") target = [d.ticket[1].filter(n=>n>0)[2]];
+        else if(p.cols) target = d.ticket.map(r=>p.cols.map(c=>r[c])).flat().filter(n=>n>0);
+        const hits = target.filter(n => called.includes(n));
+        const success = (p.id==="e5") ? hits.length>=5 : (hits.length===target.length);
+        if(success && target.includes(currentNum)) {
+            dividends[d.idx].win = d.name;
+            broadcastFeed(`🏆 ${d.name} WON ${p.name.toUpperCase()}!`);
+            confetti({ particleCount: 150, spread: 70 });
+        } else { broadcastFeed(`${d.name}: BOGIE (Invalid)`); }
+        sync();
+    }
+
+    function broadcastFeed(msg) {
+        addFeed(msg);
+        if(isHost) Object.keys(peer.connections).forEach(pid => peer.connections[pid].forEach(c => { if(c.open) c.send({type:'FEED', msg}); }));
+    }
+
+    function exitGame() { if(conn) conn.send({type:'EXIT'}); setTimeout(() => location.reload(), 150); }
+    function copyCode() { navigator.clipboard.writeText(peer.id); addFeed("CODE COPIED"); }
+    function shareWhatsApp() {
+        const url = window.location.origin + window.location.pathname + "?room=" + peer.id;
+        window.open(`https://wa.me/?text=${encodeURIComponent("Join Tambola! Code: "+peer.id+"\n"+url)}`);
+    }
+
+    window.onload = () => {
+        const r = new URLSearchParams(window.location.search).get('room');
+        if(r) document.getElementById('r-id').value = r;
+    };
+</script>
+</body>
+</html>
